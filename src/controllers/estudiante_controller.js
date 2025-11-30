@@ -185,13 +185,25 @@ const registrarEstudiante = async (req, res) => {
   }
 
   // Enviar el correo electrónico
-  await sendMailToEstudiante(email, "estud" + password);
+  let mailResult = null;
+  try {
+    mailResult = await sendMailToEstudiante(email, "estud" + password);
+    if (!mailResult || mailResult.ok === false) {
+      console.error("Mail send failed during registration:", mailResult?.error || mailResult);
+    }
+  } catch (error) {
+    console.error("Unexpected error sending mail during registration:", error);
+  }
 
   // Guardar en la base de datos
   await nuevoEstudiante.save();
 
   // Presentar resultados
-  res.status(200).json({ msg: "Registro exitoso y correo enviado" });
+  if (mailResult && mailResult.ok) {
+    res.status(200).json({ msg: "Registro exitoso y correo enviado" });
+  } else {
+    res.status(200).json({ msg: "Registro exitoso. No se pudo enviar el correo en este momento" });
+  }
 };
 
 // Middleware para manejar la subida de fotos

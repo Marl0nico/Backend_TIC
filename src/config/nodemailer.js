@@ -27,6 +27,7 @@ const createTransporter = async () => {
   try {
     const accessToken = await oauth2Client.getAccessToken();
 
+    // Configure sensible timeouts so a hang on the mail server doesn't block the app
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -35,14 +36,23 @@ const createTransporter = async () => {
         clientId: process.env.GMAIL_CLIENT_ID,
         clientSecret: process.env.GMAIL_CLIENT_SECRET,
         refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-        accessToken: accessToken.token, // generado automáticamente
+        accessToken: accessToken?.token || accessToken,
+      },
+      // timeouts (ms) to avoid long hangs
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+      tls: {
+        // Allow self-signed certs if necessary; keep false in production if not needed
+        rejectUnauthorized: false,
       },
     });
 
     return transporter;
   } catch (error) {
     console.error("Error creando el transporter:", error);
-    throw new Error("Failed to create transporter");
+    // Return null so callers can handle the fact that mail cannot be sent
+    return null;
   }
 };
 
@@ -71,7 +81,14 @@ const sendMailToUser = async (userMail, token) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    if (!transporter) throw new Error("No transporter available");
+    await transporter.sendMail(mailOptions);
+    return { ok: true };
+  } catch (error) {
+    console.error("Error sending verification mail:", error);
+    return { ok: false, error };
+  }
 };
 
 // =============================
@@ -96,7 +113,14 @@ const sendMailToRecoveryPassword = async (userMail, token) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    if (!transporter) throw new Error("No transporter available");
+    await transporter.sendMail(mailOptions);
+    return { ok: true };
+  } catch (error) {
+    console.error("Error sending recovery mail:", error);
+    return { ok: false, error };
+  }
 };
 
 // =============================
@@ -122,7 +146,14 @@ const sendMailToEstudiante = async (userMail, password) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    if (!transporter) throw new Error("No transporter available");
+    await transporter.sendMail(mailOptions);
+    return { ok: true };
+  } catch (error) {
+    console.error("Error sending welcome mail:", error);
+    return { ok: false, error };
+  }
 };
 
 // =============================
