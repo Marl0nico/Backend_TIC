@@ -3,12 +3,13 @@ const router = Router()
 
 
 import verificarAutenticacion from "../middlewares/autenticacion.js";
-import { actualizarEstudiante, actualizarPassword, agregarAmigo, eliminarAmigo, eliminarEstudiante, listarEstudiantes, listarEstudiantesDesactivados, loginEstudiante, obtenerEstudiante, perfilEstudiante, reactivarEstudiante, registrarEstudiante, subirFotoPerfil } from '../controllers/estudiante_controller.js';
+import { actualizarEstudiante, actualizarPassword, agregarAmigo, confirmarEmail, eliminarAmigo, eliminarEstudiante, listarEstudiantes, listarEstudiantesDesactivados, loginEstudiante, obtenerEstudiante, perfilEstudiante, reactivarEstudiante, registrarEstudiante, subirFotoPerfil } from '../controllers/estudiante_controller.js';
 import { verificarAdmin } from '../middlewares/verificarAdmin.js';
 import { comprobarTokenPassword, nuevoPassword, recuperarPassword } from '../controllers/administrador_controller.js';
 
 
 router.post('/estudiante/login',loginEstudiante)
+router.get('/estudiante/confirmar/:token', confirmarEmail)
 
 router.get('/estudiante/perfil',verificarAutenticacion,perfilEstudiante)
 router.get("/estudiantes",verificarAutenticacion,verificarAdmin,listarEstudiantes);

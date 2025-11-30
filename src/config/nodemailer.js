@@ -124,24 +124,28 @@ const sendMailToRecoveryPassword = async (userMail, token) => {
 };
 
 // =============================
-// FUNCION: MAIL PARA ESTUDIANTES
+// FUNCION: MAIL PARA ESTUDIANTES (CONFIRMACION)
 // =============================
-const sendMailToEstudiante = async (userMail, password) => {
+const sendMailToEstudiante = async (userMail, token) => {
   const transporter = await createTransporter();
+
+  const confirmationLink = `${process.env.URL_FRONTEND}/confirmar/${encodeURIComponent(token)}`;
 
   const mailOptions = {
     from: `Uni-Connect <${process.env.GMAIL_USER}>`,
     to: userMail,
-    subject: "Bienvenido a la Comunidad Universitaria 🎓",
+    subject: "Confirma tu registro en Uni-Connect 🎓",
     html: `
-    <div style="font-family: Arial; padding: 20px;">
-      <h1>🎓 Uni-Connect</h1>
-      <p>Bienvenido a nuestra comunidad universitaria.</p>
-      <p>Haz clic para iniciar sesión:</p>
-      <a href="${process.env.URL_FRONTEND}/login"
-         style="padding: 10px 20px; background: #3498db; color: white; border-radius: 5px; text-decoration: none;">
-         Iniciar sesión
+    <div style="font-family: Arial; padding: 20px; background-color: #f5f5f5; border-radius: 10px;">
+      <h1 style="color: #3498db;">🎓 Uni-Connect</h1>
+      <p>¡Bienvenido a nuestra comunidad universitaria!</p>
+      <p>Para completar tu registro, haz clic en el siguiente botón para confirmar tu correo electrónico:</p>
+      <a href="${confirmationLink}"
+         style="display: inline-block; padding: 12px 24px; background: #3498db; color: white; border-radius: 5px; text-decoration: none; font-weight: bold;">
+         Confirmar mi registro
       </a>
+      <p style="margin-top: 20px; color: #666;">Si no creaste esta cuenta, puedes ignorar este mensaje.</p>
+      <p style="color: #999; font-size: 12px;">Este enlace expira en 24 horas.</p>
     </div>
     `,
   };

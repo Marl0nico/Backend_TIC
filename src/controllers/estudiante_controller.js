@@ -74,6 +74,12 @@ const loginEstudiante = async (req, res) => {
       .json({ msg: "Lo sentimos, el usuario no se encuentra registrado" });
   }
 
+  // Verificar si la cuenta está confirmada
+  if (!estudianteBDD.confirmado) {
+    return res.status(403).json({
+      msg: "Tu cuenta no ha sido confirmada. Revisa tu correo electrónico para confirmar tu registro.",
+    });
+  }
 
   //Verificar si el estudiante se encuentra activo
   if (estudianteBDD.estado===false){
@@ -166,6 +172,10 @@ const registrarEstudiante = async (req, res) => {
   // Encriptar el password
   nuevoEstudiante.password = await nuevoEstudiante.encrypPassword(password);
 
+  // Generar token de confirmación
+  const tokenConfirmacion = nuevoEstudiante.crearToken();
+  nuevoEstudiante.tokenConfirmacion = tokenConfirmacion;
+
   // Subir la foto de perfil a Cloudinary si se ha proporcionado
   if (req.file) {
     try {
@@ -184,26 +194,31 @@ const registrarEstudiante = async (req, res) => {
     }
   }
 
-  // Enviar el correo electrónico
+  // Guardar estudiante primero (con confirmado: false y tokenConfirmacion)
+  await nuevoEstudiante.save();
+
+  // Enviar el correo electrónico con token de confirmación
   let mailResult = null;
   try {
-    mailResult = await sendMailToEstudiante(email, "estud" + password);
+    mailResult = await sendMailToEstudiante(email, tokenConfirmacion);
     if (!mailResult || mailResult.ok === false) {
       console.error("Mail send failed during registration:", mailResult?.error || mailResult);
+      // Si falla el email, eliminar el estudiante creado para evitar cuentas sin confirmar
+      await Estudiante.findByIdAndDelete(nuevoEstudiante._id);
+      return res
+        .status(500)
+        .json({ msg: "Error al enviar correo de confirmación. Por favor, intenta nuevamente." });
     }
   } catch (error) {
     console.error("Unexpected error sending mail during registration:", error);
+    await Estudiante.findByIdAndDelete(nuevoEstudiante._id);
+    return res
+      .status(500)
+      .json({ msg: "Error al enviar correo de confirmación. Por favor, intenta nuevamente." });
   }
-
-  // Guardar en la base de datos
-  await nuevoEstudiante.save();
 
   // Presentar resultados
-  if (mailResult && mailResult.ok) {
-    res.status(200).json({ msg: "Registro exitoso y correo enviado" });
-  } else {
-    res.status(200).json({ msg: "Registro exitoso. No se pudo enviar el correo en este momento" });
-  }
+  res.status(200).json({ msg: "Registro exitoso. Por favor, confirma tu email para completar el registro." });
 };
 
 // Middleware para manejar la subida de fotos
@@ -543,6 +558,35 @@ const actualizarPassword = async (req, res) => {
 
   res.status(200).json({ msg: "Contraseña actualizada correctamente" });
 };
+
+// Método para confirmar el registro por email
+const confirmarEmail = async (req, res) => {
+  const { token } = req.params;
+
+  if (!token) {
+    return res.status(400).json({ msg: "Token de confirmación no proporcionado" });
+  }
+
+  try {
+    // Buscar el estudiante por token de confirmación
+    const estudiante = await Estudiante.findOne({ tokenConfirmacion: token });
+
+    if (!estudiante) {
+      return res.status(404).json({ msg: "Token inválido o expirado" });
+    }
+
+    // Marcar como confirmado y limpiar el token
+    estudiante.confirmado = true;
+    estudiante.tokenConfirmacion = null;
+    await estudiante.save();
+
+    res.status(200).json({ msg: "Tu cuenta ha sido confirmada exitosamente. Ya puedes iniciar sesión." });
+  } catch (error) {
+    console.error("Error confirming email:", error);
+    res.status(500).json({ msg: "Error al confirmar tu email. Por favor, intenta nuevamente." });
+  }
+};
+
 export {
   loginEstudiante,
   perfilEstudiante,
@@ -557,4 +601,5 @@ export {
   eliminarAmigo,
   listarEstudiantesDesactivados,
   actualizarPassword,
+  confirmarEmail,
 };
