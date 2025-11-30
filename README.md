@@ -15,8 +15,8 @@ API para comunidades universitarias cercanas a la EPN (Escuela Politécnica Naci
 
 1. **Clonar el repositorio**:
    ```bash
-   git clone https://github.com/michelle2444444/UConnect-API.git
-   cd api-restful-connect.
+   git clone https://github.com/Marl0nico/Backend_TIC.git
+   cd Back
 
 Estructura del proyecto
 
@@ -113,7 +113,7 @@ Modo desarrollo (con Nodemon):
 ### Despliegue en Render 🚀
 
 La API está desplegada en Render.
-URL de producción: https://api-restful-iul9.onrender.com
+URL de producción: https://backend-tic-wflp.onrender.com
 **Pasos para despliegue**:
 
 - Conectar repositorio de GitHub a Render.
