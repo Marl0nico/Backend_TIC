@@ -69,14 +69,6 @@ const estudianteSchema = new Schema(
       type: String,
       default: "Estudiante",
     },
-    confirmado: {
-      type: Boolean,
-      default: false, // Account not confirmed until email link is clicked
-    },
-    tokenConfirmacion: {
-      type: String,
-      default: null, // Token sent in email confirmation link
-    },
     amigos: [
       {
         type: Schema.Types.ObjectId,
