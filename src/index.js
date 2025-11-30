@@ -67,6 +67,15 @@ app.use((req, res) => {
   res.status(404).send("Endpoint no encontrado - 404");
 });
 
+// Error handler global
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    msg: "Error interno del servidor",
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
 // =========================
 //        Servidor
 // =========================

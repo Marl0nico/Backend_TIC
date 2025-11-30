@@ -134,91 +134,105 @@ const loginEstudiante = async (req, res) => {
 
 // Controlador para registrar un estudiante
 const registrarEstudiante = async (req, res) => {
-  // Desestructurar los campos necesarios
-  const { email, usuario, password } = req.body;
-  const validDomains = ["@puce.edu.ec", "@epn.edu.ec", "@est.ups.edu.ec"];
-  // Validar que todos los campos estén llenos
-  if (Object.values(req.body).includes(null)) {
-    return res
-      .status(400)
-      .json({ msg: "Lo sentimos, debes llenar todos los campos" });
-  }
-
-  if (!validDomains.some((domain) => email.endsWith(domain))) {
-    return res
-      .status(400)
-      .json({ msg: "Lo sentimos, debes ingresar un correo válido" });
-  }
-
-  // Verificar si el estudiante ya está registrado
-  const verificarEmailBDD = await Estudiante.findOne({ email });
-  const verificarUsuarioBDD = await Estudiante.findOne({ usuario });
-
-  if (verificarEmailBDD) {
-    return res
-      .status(400)
-      .json({ msg: "Lo sentimos, el email ya está registrado" });
-  }
-
-  if (verificarUsuarioBDD) {
-    return res
-      .status(400)
-      .json({ msg: "Lo sentimos, el usuario ya está registrado" });
-  }
-
-  // Crear una instancia del estudiante
-  const nuevoEstudiante = new Estudiante(req.body);
-
-  // Encriptar el password
-  nuevoEstudiante.password = await nuevoEstudiante.encrypPassword(password);
-
-  // Generar token de confirmación
-  const tokenConfirmacion = nuevoEstudiante.crearToken();
-  nuevoEstudiante.tokenConfirmacion = tokenConfirmacion;
-
-  // Subir la foto de perfil a Cloudinary si se ha proporcionado
-  if (req.file) {
-    try {
-      const result = await cloudinary.v2.uploader.upload(req.file.path, {
-        folder: "estudiantes_perfil", // Carpeta en Cloudinary donde se guardarán las fotos
-      });
-      nuevoEstudiante.fotoPerfil = {
-        url: result.secure_url,
-        public_id: result.public_id,
-      };
-      await fs.remove(uploadDir);
-    } catch (error) {
-      return res
-        .status(502)
-        .json({ msg: "Error al subir la foto de perfil a Cloudinary" });
-    }
-  }
-
-  // Guardar estudiante primero (con confirmado: false y tokenConfirmacion)
-  await nuevoEstudiante.save();
-
-  // Enviar el correo electrónico con token de confirmación
-  let mailResult = null;
   try {
-    mailResult = await sendMailToEstudiante(email, tokenConfirmacion);
-    if (!mailResult || mailResult.ok === false) {
-      console.error("Mail send failed during registration:", mailResult?.error || mailResult);
-      // Si falla el email, eliminar el estudiante creado para evitar cuentas sin confirmar
-      await Estudiante.findByIdAndDelete(nuevoEstudiante._id);
+    // Desestructurar los campos necesarios
+    const { email, usuario, password } = req.body;
+    const validDomains = ["@puce.edu.ec", "@epn.edu.ec", "@est.ups.edu.ec"];
+    
+    console.log("[REGISTRO] Iniciando registro para:", email);
+    
+    // Validar que todos los campos estén llenos
+    if (Object.values(req.body).includes(null)) {
+      console.log("[REGISTRO] Campos vacíos detectados");
       return res
-        .status(500)
-        .json({ msg: "Error al enviar correo de confirmación. Por favor, intenta nuevamente." });
+        .status(400)
+        .json({ msg: "Lo sentimos, debes llenar todos los campos" });
     }
-  } catch (error) {
-    console.error("Unexpected error sending mail during registration:", error);
-    await Estudiante.findByIdAndDelete(nuevoEstudiante._id);
-    return res
-      .status(500)
-      .json({ msg: "Error al enviar correo de confirmación. Por favor, intenta nuevamente." });
-  }
 
-  // Presentar resultados
-  res.status(200).json({ msg: "Registro exitoso. Por favor, confirma tu email para completar el registro." });
+    if (!validDomains.some((domain) => email.endsWith(domain))) {
+      console.log("[REGISTRO] Email con dominio inválido:", email);
+      return res
+        .status(400)
+        .json({ msg: "Lo sentimos, debes ingresar un correo válido" });
+    }
+
+    // Verificar si el estudiante ya está registrado
+    const verificarEmailBDD = await Estudiante.findOne({ email });
+    const verificarUsuarioBDD = await Estudiante.findOne({ usuario });
+
+    if (verificarEmailBDD) {
+      console.log("[REGISTRO] Email ya registrado:", email);
+      return res
+        .status(400)
+        .json({ msg: "Lo sentimos, el email ya está registrado" });
+    }
+
+    if (verificarUsuarioBDD) {
+      console.log("[REGISTRO] Usuario ya registrado:", usuario);
+      return res
+        .status(400)
+        .json({ msg: "Lo sentimos, el usuario ya está registrado" });
+    }
+
+    // Crear una instancia del estudiante
+    const nuevoEstudiante = new Estudiante(req.body);
+    console.log("[REGISTRO] Instancia estudiante creada");
+
+    // Encriptar el password
+    nuevoEstudiante.password = await nuevoEstudiante.encrypPassword(password);
+    console.log("[REGISTRO] Password encriptado");
+
+    // Generar token de confirmación
+    const tokenConfirmacion = nuevoEstudiante.crearToken();
+    nuevoEstudiante.tokenConfirmacion = tokenConfirmacion;
+    console.log("[REGISTRO] Token generado:", tokenConfirmacion.substring(0, 5) + "...");
+
+    // Subir la foto de perfil a Cloudinary si se ha proporcionado
+    if (req.file) {
+      try {
+        console.log("[REGISTRO] Iniciando carga a Cloudinary");
+        const result = await cloudinary.v2.uploader.upload(req.file.path, {
+          folder: "estudiantes_perfil",
+        });
+        nuevoEstudiante.fotoPerfil = {
+          url: result.secure_url,
+          public_id: result.public_id,
+        };
+        await fs.remove(uploadDir);
+        console.log("[REGISTRO] Foto subida exitosamente");
+      } catch (error) {
+        console.error("[REGISTRO] Error subiendo foto:", error);
+        return res
+          .status(502)
+          .json({ msg: "Error al subir la foto de perfil a Cloudinary" });
+      }
+    }
+
+    // Guardar estudiante primero (con confirmado: false y tokenConfirmacion)
+    await nuevoEstudiante.save();
+    console.log("[REGISTRO] Estudiante guardado en BD con ID:", nuevoEstudiante._id);
+
+    // Enviar el correo electrónico con token de confirmación (no bloqueante)
+    // Se envía en background, el registro continúa
+    sendMailToEstudiante(email, tokenConfirmacion)
+      .then((mailResult) => {
+        if (!mailResult || mailResult.ok === false) {
+          console.error("[REGISTRO] Error enviando email:", mailResult?.error || mailResult);
+        } else {
+          console.log("[REGISTRO] Email de confirmación enviado exitosamente a:", email);
+        }
+      })
+      .catch((error) => {
+        console.error("[REGISTRO] Excepción al enviar email:", error);
+      });
+
+    // Presentar resultados (sin esperar el email)
+    console.log("[REGISTRO] Respondiendo al cliente - registro exitoso");
+    res.status(200).json({ msg: "Registro exitoso. Por favor, confirma tu email revisando tu correo electrónico." });
+  } catch (error) {
+    console.error("[REGISTRO] Error no controlado:", error);
+    res.status(500).json({ msg: "Error en el servidor durante el registro" });
+  }
 };
 
 // Middleware para manejar la subida de fotos
