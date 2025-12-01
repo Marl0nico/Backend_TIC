@@ -5,6 +5,8 @@ import fs from "fs-extra";
 import path from "path"
 import mongoose from "mongoose";
 import Comunidad from "../models/Comunidad.js";
+import Publicacion from "../models/Publicaciones.js";
+import Comentario from "../models/Comentario.js";
 import { dirname } from "path";
 import Estudiante from '../models/Estudiante.js';  
 import { fileURLToPath } from "url";
@@ -293,17 +295,62 @@ const eliminarComunidad = async (req, res) => {
       return res.status(404).json({ msg: "Comunidad no encontrada" });
     }
 
-    // Eliminar la imagen de Cloudinary si existe
-    if (comunidad.logo?.public_id) {
-      await cloudinary.v2.uploader.destroy(comunidad.logo.public_id);
+    // Eliminar publicaciones y comentarios relacionados
+    try {
+      const publicaciones = await Publicacion.find({ comunidad: id });
+
+      // Eliminar imágenes de las publicaciones en Cloudinary si existen
+      for (const pub of publicaciones) {
+        if (pub.imagen?.public_id) {
+          try {
+            await cloudinary.v2.uploader.destroy(pub.imagen.public_id);
+          } catch (err) {
+            console.error('Error eliminando imagen de publicación en Cloudinary:', err);
+          }
+        }
+      }
+
+      // Eliminar comentarios asociados a las publicaciones
+      const pubIds = publicaciones.map((p) => p._id);
+      try {
+        await Comentario.deleteMany({ publicacion: { $in: pubIds } });
+      } catch (err) {
+        console.error('Error eliminando comentarios asociados a publicaciones:', err);
+      }
+
+      // Eliminar las publicaciones
+      try {
+        await Publicacion.deleteMany({ comunidad: id });
+      } catch (err) {
+        console.error('Error eliminando publicaciones de la comunidad:', err);
+      }
+    } catch (err) {
+      console.error('Error procesando publicaciones/comentarios al eliminar comunidad:', err);
     }
 
-    // Dar de baja al estudiante
-    comunidad.estado = false;
-    await comunidad.save();
-    res
-      .status(200)
-      .json({ msg: "La comunidad ha sido dado de baja exitosamente" });
+    // Eliminar la imagen del logo de la comunidad en Cloudinary si existe
+    if (comunidad.logo?.public_id) {
+      try {
+        await cloudinary.v2.uploader.destroy(comunidad.logo.public_id);
+      } catch (err) {
+        console.error('Error eliminando logo en Cloudinary:', err);
+      }
+    }
+
+    // Eliminar la comunidad permanentemente de la base de datos
+    await Comunidad.findByIdAndDelete(id);
+
+    // Remover la referencia de esta comunidad en los estudiantes
+    try {
+      await Estudiante.updateMany(
+        { comunidades: id },
+        { $pull: { comunidades: id } }
+      );
+    } catch (err) {
+      console.error('Error removiendo referencias de estudiantes:', err);
+    }
+
+    res.status(200).json({ msg: "La comunidad ha sido eliminada permanentemente" });
   } catch (error) {
     res
       .status(500)
