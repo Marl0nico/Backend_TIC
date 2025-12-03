@@ -21,7 +21,7 @@ import connection from "./database.js";
 // =========================
 const allowedOrigins = [
   process.env.URL_FRONTEND,
-  "http://localhost:5173",
+  
   "https://proyecto-tic25.netlify.app",
 ];
 

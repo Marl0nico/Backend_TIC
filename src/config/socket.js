@@ -4,7 +4,7 @@ import express from "express";
 
 const app = express();
 const server = http.createServer(app);
-const allowedOrigins = [process.env.URL_FRONTEND,'http://localhost:5173/'];
+const allowedOrigins = [process.env.URL_FRONTEND,'https://proyecto-tic25.netlify.app'];
 
 const io = new Server(server, {
   cors: {
