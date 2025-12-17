@@ -1,6 +1,7 @@
 import Publicacion from '../models/Publicaciones.js';
 import cloudinary from '../config/cloudinary.js';
 import Estudiante from '../models/Estudiante.js';
+import { io } from '../config/socket.js';
 
 export const crearPublicacion = async (req, res) => {
   try {
@@ -36,6 +37,9 @@ export const crearPublicacion = async (req, res) => {
 
     const publicacionConAutor = await Publicacion.findById(nuevaPublicacion._id)
       .populate("autor", "usuario fotoPerfil");
+
+    // 🔥 Emitir evento WebSocket a todos los clientes conectados en esta comunidad
+    io.emit(`newPublicacion_${comunidad}`, publicacionConAutor);
 
     res.status(201).json(publicacionConAutor);
 
@@ -88,6 +92,9 @@ export const eliminarPublicacion = async (req, res) => {
 
     // Eliminar la publicación
     await Publicacion.findByIdAndDelete(id);
+
+    // 🔥 Emitir evento WebSocket a todos los clientes conectados en esta comunidad
+    io.emit(`deletePublicacion_${publicacion.comunidad}`, { publicacionId: id });
 
     res.status(200).json({ mensaje: 'Publicación eliminada correctamente' });
 

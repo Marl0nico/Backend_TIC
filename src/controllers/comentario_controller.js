@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Comentario from "../models/Comentario.js";
 import Publicacion from "../models/Publicaciones.js";
 import Comunidad from "../models/Comunidad.js";
+import { io } from "../config/socket.js";
 
 // Crear un nuevo comentario
 export const crearComentario = async (req, res) => {
@@ -56,6 +57,12 @@ export const crearComentario = async (req, res) => {
     const populated = await Comentario.findById(nuevoComentario._id)
       .populate("usuario", "_id usuario fotoPerfil");
 
+    // 🔥 Emitir evento WebSocket a todos los clientes conectados en esta comunidad
+    io.emit(`newComentario_${comunidad}`, {
+      ...populated.toObject(),
+      publicacionId: publicacion
+    });
+
     // Respondemos con el comentario creado y poblado
     res.status(201).json(populated);
 
@@ -100,6 +107,12 @@ export const eliminarComentario = async (req, res) => {
     // Eliminamos el comentario
     await Comentario.findByIdAndDelete(id);
 
+    // 🔥 Emitir evento WebSocket a todos los clientes conectados en esta comunidad
+    io.emit(`deleteComentario_${comentario.comunidad}`, {
+      comentarioId: id,
+      publicacionId: comentario.publicacion
+    });
+
     res.status(200).json({ mensaje: "Comentario eliminado correctamente" });
 
   } catch (error) {
@@ -117,18 +130,45 @@ export const editarComentario = async (req, res) => {
       return res.status(400).json({ error: "ID de comentario inválido" });
     }
 
+    // Extraemos el token del header
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: "Token no proporcionado" });
+    }
+
+    // Verificamos el token y extraemos el ID del usuario
+    const { idToken } = jwt.verify(token, process.env.JWT_SECRET);
+
     const comentario = await Comentario.findById(id);
     if (!comentario) {
       return res.status(404).json({ error: "Comentario no encontrado" });
     }
 
-    // Editar directamente, sin verificar usuario ni token
+    // 🔒 Verificar que el usuario autenticado sea el autor del comentario
+    if (comentario.usuario.toString() !== idToken) {
+      return res.status(403).json({ error: "No tienes permiso para editar este comentario" });
+    }
+
+    // Editar comentario
     comentario.contenido = contenido;
     await comentario.save();
 
+    // Buscar el comentario actualizado con datos del usuario
+    const comentarioActualizado = await Comentario.findById(id)
+      .populate("usuario", "_id usuario fotoPerfil");
+
+    // 🔥 Emitir evento WebSocket a todos los clientes conectados en esta comunidad
+    io.emit(`updateComentario_${comentario.comunidad}`, {
+      _id: comentarioActualizado._id,
+      contenido: comentarioActualizado.contenido,
+      usuario: comentarioActualizado.usuario,
+      publicacionId: comentario.publicacion,
+      communityId: comentario.comunidad
+    });
+
     res.status(200).json({
       mensaje: "Comentario actualizado correctamente",
-      comentario,
+      comentario: comentarioActualizado,
     });
   } catch (error) {
     console.error("Error al editar el comentario:", error);
